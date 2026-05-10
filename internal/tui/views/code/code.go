@@ -5,10 +5,10 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/robherley/snips.sh/internal/renderer"
 	"github.com/robherley/snips.sh/internal/snips"
 	"github.com/robherley/snips.sh/internal/tui/msgs"
@@ -16,55 +16,49 @@ import (
 )
 
 type Code struct {
-	viewport *viewport.Model
+	viewport viewport.Model
 	file     *snips.File
 	content  string
 }
 
-func New(width, height int) *Code {
-	vp := viewport.New(width, height)
-	return &Code{
-		viewport: &vp,
+func New(width, height int) Code {
+	return Code{
+		viewport: viewport.New(viewport.WithWidth(width), viewport.WithHeight(height)),
 	}
 }
 
-func (m *Code) Init() tea.Cmd {
-	m.viewport.GotoTop()
-	m.viewport.SetContent(m.content)
+func (m Code) Init() tea.Cmd {
 	return nil
 }
 
-func (m *Code) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
-
+func (m Code) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.viewport.Width = msg.Width
-		m.viewport.Height = msg.Height
+		m.viewport.SetWidth(msg.Width)
+		m.viewport.SetHeight(msg.Height)
 	case msgs.FileLoaded:
 		m.file = msg.File
 		m.content = m.renderContent(msg.File)
-		m.Init()
+		m.viewport.GotoTop()
+		m.viewport.SetContent(m.content)
 	case msgs.FileDeselected:
 		m.file = nil
 	}
 
-	vp, cmd := m.viewport.Update(msg)
-	m.viewport = &vp
-	cmds = append(cmds, cmd)
-
-	return m, tea.Batch(cmds...)
+	var cmd tea.Cmd
+	m.viewport, cmd = m.viewport.Update(msg)
+	return m, cmd
 }
 
-func (m *Code) View() string {
-	return m.viewport.View()
+func (m Code) View() tea.View {
+	return tea.NewView(m.viewport.View())
 }
 
 func (m Code) Keys() help.KeyMap {
 	return keys
 }
 
-func (m *Code) renderContent(file *snips.File) string {
+func (m Code) renderContent(file *snips.File) string {
 	if file == nil {
 		return ""
 	}
